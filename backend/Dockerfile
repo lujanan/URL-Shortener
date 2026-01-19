@@ -21,7 +21,9 @@ COPY --from=builder /app/url-shortener /app/url-shortener
 EXPOSE 8080
 
 ENV PORT=8080
-ENV DB_DSN="shortuser:shortpass@tcp(mysql:3306)/shorturl?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci"
+ENV REDIS_ADDR=redis:6379
+ENV REDIS_PASSWORD=
+ENV REDIS_DB=0
 
 ENTRYPOINT ["/app/url-shortener"]
 

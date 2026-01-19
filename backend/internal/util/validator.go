@@ -32,15 +32,25 @@ func ValidateCode(code string) error {
 	if code == "" {
 		return ErrEmptyCode
 	}
+	if len(code) < 6 {
+		return ErrCodeTooShort
+	}
 	if len(code) > 32 {
 		return ErrCodeTooLong
 	}
+	allDigits := true
 	for _, char := range code {
 		if !((char >= '0' && char <= '9') ||
 			(char >= 'A' && char <= 'Z') ||
 			(char >= 'a' && char <= 'z')) {
 			return ErrInvalidCode
 		}
+		if char < '0' || char > '9' {
+			allDigits = false
+		}
+	}
+	if allDigits {
+		return ErrCodeAllDigits
 	}
 	return nil
 }

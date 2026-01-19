@@ -1,17 +1,18 @@
 package main
 
 import (
-	"database/sql"
+	"context"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	redisv9 "github.com/redis/go-redis/v9"
 
 	"url-shortener/backend/internal/handler"
 	"url-shortener/backend/internal/service"
-	"url-shortener/backend/internal/storage/mysql"
+	storageredis "url-shortener/backend/internal/storage/redis"
 )
 
 func main() {
@@ -21,30 +22,27 @@ func main() {
 		port = "8080"
 	}
 
-	dbDSN := os.Getenv("DB_DSN")
-	if dbDSN == "" {
-		dbDSN = "shortuser:shortpass@tcp(mysql:3306)/shorturl?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci"
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "redis:6379"
 	}
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+	redisDB := 0
 
 	baseURL := os.Getenv("BASE_URL")
 	if baseURL == "" {
 		baseURL = "http://localhost:8080"
 	}
 
-	// 初始化数据库连接
-	db, err := initDatabase(dbDSN)
+	// 初始化 Redis
+	rdb, err := initRedis(redisAddr, redisPassword, redisDB)
 	if err != nil {
-		log.Fatalf("failed to initialize database: %v", err)
+		log.Fatalf("failed to initialize redis: %v", err)
 	}
-	defer db.Close()
-
-	// 初始化数据库表结构
-	if err := mysql.InitSchema(db); err != nil {
-		log.Fatalf("failed to init database schema: %v", err)
-	}
+	defer func() { _ = rdb.Close() }()
 
 	// 初始化 Repository
-	repo := mysql.NewRepository(db)
+	repo := storageredis.NewRepository(rdb)
 
 	// 初始化 Service
 	linkService := service.NewLinkService(repo, baseURL)
@@ -97,31 +95,28 @@ func main() {
 	}
 }
 
-// initDatabase 初始化数据库连接，带重试机制
-func initDatabase(dsn string) (*sql.DB, error) {
-	var db *sql.DB
+// initRedis 初始化 Redis 连接，带重试机制
+func initRedis(addr, password string, db int) (*redisv9.Client, error) {
+	var rdb *redisv9.Client
 	var err error
 
-	// 重试连接数据库（等待 MySQL 容器启动）
+	// 重试连接 Redis（等待 Redis 容器启动）
 	maxRetries := 30
 	for i := 0; i < maxRetries; i++ {
-		db, err = sql.Open("mysql", dsn)
+		rdb = redisv9.NewClient(&redisv9.Options{
+			Addr:     addr,
+			Password: password,
+			DB:       db,
+		})
+
+		_, err = rdb.Ping(context.Background()).Result()
 		if err != nil {
-			log.Printf("failed to open database (attempt %d/%d): %v", i+1, maxRetries, err)
+			log.Printf("failed to ping redis (attempt %d/%d): %v", i+1, maxRetries, err)
+			_ = rdb.Close()
 			time.Sleep(2 * time.Second)
 			continue
 		}
-
-		// 测试连接
-		if err = db.Ping(); err != nil {
-			log.Printf("failed to ping database (attempt %d/%d): %v", i+1, maxRetries, err)
-			db.Close()
-			time.Sleep(2 * time.Second)
-			continue
-		}
-
-		// 连接成功
-		log.Println("Database connection established")
+		log.Println("Redis connection established")
 		break
 	}
 
@@ -129,10 +124,5 @@ func initDatabase(dsn string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	// 设置连接池参数
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
-
-	return db, nil
+	return rdb, nil
 }

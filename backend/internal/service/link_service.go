@@ -11,16 +11,16 @@ import (
 )
 
 type LinkService struct {
-	repo     storage.LinkRepository
-	baseURL  string
-	codeGen  func(int64) string
+	repo    storage.LinkRepository
+	baseURL string
+	codeGen func(int64) string
 }
 
 func NewLinkService(repo storage.LinkRepository, baseURL string) *LinkService {
 	return &LinkService{
 		repo:    repo,
 		baseURL: baseURL,
-		codeGen: util.EncodeBase62,
+		codeGen: util.GenerateCodeFromID,
 	}
 }
 
@@ -71,10 +71,8 @@ func (s *LinkService) CreateShortLink(ctx context.Context, req *CreateRequest) (
 			return nil, &ServiceError{Type: "conflict", Message: "custom code already exists"}
 		}
 	} else {
-		// 自动生成短码：先插入一条记录获取 ID，然后用 ID 生成短码
-		// 为了简化，我们先生成一个临时短码，如果冲突则重试
-		// 实际生产环境可以使用更复杂的策略（如预分配 ID 段）
-		code, err = s.generateUniqueCode(ctx)
+		// 生成随机短码，确保唯一性
+		code, err = s.generateUniqueRandomCode(ctx)
 		if err != nil {
 			return nil, &ServiceError{Type: "internal_error", Message: "failed to generate code"}
 		}
@@ -86,15 +84,20 @@ func (s *LinkService) CreateShortLink(ctx context.Context, req *CreateRequest) (
 	}
 
 	link := &model.ShortLink{
-		Code:    code,
-		LongURL: req.URL,
-		ExpireAt: req.ExpireAt,
+		ID:        0,
+		Code:      code,
+		LongURL:   req.URL,
+		CreatedAt: time.Now().UTC(),
+		ExpireAt:  req.ExpireAt,
 	}
+
+	// 随机生成的短码不需要设置 ID（Redis 存储中 ID 字段可选）
 
 	created, err := s.repo.Create(ctx, link)
 	if err != nil {
-		// 检查是否是唯一约束冲突
-		if isDuplicateKeyError(err) {
+		// Redis 场景下：只要写入失败且短码已存在，统一返回冲突（更友好）
+		existing, _ := s.repo.GetByCode(ctx, code)
+		if existing != nil {
 			return nil, &ServiceError{Type: "conflict", Message: "code already exists"}
 		}
 		return nil, &ServiceError{Type: "internal_error", Message: "failed to create short link"}
@@ -107,35 +110,6 @@ func (s *LinkService) CreateShortLink(ctx context.Context, req *CreateRequest) (
 		LongURL:  created.LongURL,
 		ExpireAt: created.ExpireAt,
 	}, nil
-}
-
-// generateUniqueCode 生成唯一的短码（简化版：使用时间戳 + 随机数，实际可用 ID 生成）
-func (s *LinkService) generateUniqueCode(ctx context.Context) (string, error) {
-	// 简化实现：使用时间戳的 Base62 编码 + 随机后缀
-	// 实际生产环境建议使用数据库自增 ID + Base62
-	timestamp := time.Now().UnixNano()
-	code := util.EncodeBase62(timestamp)
-	// 确保长度合理（取前 8 位，如果不够则补零）
-	if len(code) < 6 {
-		code = code + "000000"[:6-len(code)]
-	}
-	if len(code) > 8 {
-		code = code[:8]
-	}
-
-	// 检查是否冲突，如果冲突则追加随机字符
-	for i := 0; i < 10; i++ {
-		existing, err := s.repo.GetByCode(ctx, code)
-		if err != nil {
-			return "", err
-		}
-		if existing == nil {
-			return code, nil
-		}
-		// 冲突则追加字符
-		code = code + util.EncodeBase62(int64(i))[:1]
-	}
-	return code, errors.New("failed to generate unique code after retries")
 }
 
 // GetLongURL 根据短码获取长链接（用于重定向）
@@ -155,7 +129,7 @@ func (s *LinkService) GetLongURL(ctx context.Context, code string) (string, erro
 
 	// 异步更新点击次数（可选：可以放到 goroutine 中）
 	go func() {
-		_ = s.repo.IncrementClick(context.Background(), link.ID)
+		_ = s.repo.IncrementClick(context.Background(), code)
 	}()
 
 	return link.LongURL, nil
@@ -191,24 +165,27 @@ func (e *ServiceError) Error() string {
 	return e.Message
 }
 
-// isDuplicateKeyError 检查是否是唯一约束冲突（MySQL 错误码 1062）
-func isDuplicateKeyError(err error) bool {
-	if err == nil {
-		return false
-	}
-	errStr := err.Error()
-	return contains(errStr, "Duplicate entry") || contains(errStr, "1062")
-}
+// generateUniqueRandomCode 生成唯一的随机短码（重试机制）
+func (s *LinkService) generateUniqueRandomCode(ctx context.Context) (string, error) {
+	maxRetries := 10
+	defaultLength := 8 // 默认 8 位随机码
 
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || indexOf(s, substr) >= 0)
-}
-
-func indexOf(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
+	for i := 0; i < maxRetries; i++ {
+		code, err := util.GenerateRandomCode(defaultLength)
+		if err != nil {
+			return "", err
 		}
+
+		// 检查是否已存在
+		existing, err := s.repo.GetByCode(ctx, code)
+		if err != nil {
+			return "", err
+		}
+		if existing == nil {
+			return code, nil
+		}
+		// 冲突则重试
 	}
-	return -1
+
+	return "", errors.New("failed to generate unique code after retries")
 }

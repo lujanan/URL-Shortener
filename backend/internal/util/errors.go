@@ -8,6 +8,8 @@ var (
 	ErrInvalidURL    = errors.New("invalid url format, must be http or https")
 	ErrInvalidScheme = errors.New("url scheme must be http or https")
 	ErrEmptyCode     = errors.New("code is required")
+	ErrCodeTooShort  = errors.New("code must be at least 6 characters")
 	ErrCodeTooLong   = errors.New("code exceeds maximum length of 32 characters")
 	ErrInvalidCode   = errors.New("code contains invalid characters, only alphanumeric allowed")
+	ErrCodeAllDigits = errors.New("code cannot be all digits")
 )
