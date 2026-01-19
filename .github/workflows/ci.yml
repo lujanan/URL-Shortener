@@ -1,0 +1,30 @@
+name: 自动验收 (Auto Check)
+
+on: [push]
+
+jobs:
+  docker-build-check:
+    runs-on: ubuntu-latest
+    # 设置超时时间
+    # 防止候选人的构建脚本卡死（如下载超大文件或死循环），浪费你的 GitHub Actions 免费额度
+    timeout-minutes: 10 
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # 先检查文件是否存在
+      # 如果直接跑 docker compose，报错会很难看。这样写报错信息更人性化。
+      - name: 📂 检查核心文件 (File Check)
+        run: |
+          if [ ! -f "docker-compose.yml" ]; then
+            echo "❌ Critical Error: 根目录下未找到 docker-compose.yml 文件！"
+            echo "💡 提示：所有题目（包括移动端）都必须包含后端 Docker 配置，请检查文件位置。"
+            exit 1
+          fi
+
+      - name: 🔍 验证配置有效性 (Config Check)
+        run: docker compose config
+        
+      - name: 🏗️ 测试 Docker 构建 (Build Test)
+        run: docker compose build
