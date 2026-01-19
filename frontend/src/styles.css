@@ -1,0 +1,165 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top left, #111827, #020617);
+  color: #e5e7eb;
+}
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.card {
+  width: 100%;
+  max-width: 520px;
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: 24px;
+  padding: 28px 24px 24px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  backdrop-filter: blur(18px);
+}
+
+.title {
+  margin: 0 0 4px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.subtitle {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+.form {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.label {
+  font-size: 13px;
+  color: #d1d5db;
+  display: grid;
+  gap: 6px;
+}
+
+.input {
+  border-radius: 999px;
+  border: 1px solid rgba(55, 65, 81, 0.9);
+  padding: 9px 14px;
+  font-size: 14px;
+  background: rgba(15, 23, 42, 0.8);
+  color: #f9fafb;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.input::placeholder {
+  color: #6b7280;
+}
+
+.input:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.6);
+  background: #020617;
+}
+
+.button {
+  margin-top: 2px;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  background: linear-gradient(135deg, #38bdf8, #a855f7);
+  color: #0b1120;
+  box-shadow: 0 14px 45px rgba(56, 189, 248, 0.45);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+
+.button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 60px rgba(56, 189, 248, 0.6);
+  filter: brightness(1.05);
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 10px 35px rgba(56, 189, 248, 0.4);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+  box-shadow: none;
+}
+
+.alert {
+  margin-top: 4px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.alert-error {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fecaca;
+}
+
+.result {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(75, 85, 99, 0.8);
+  font-size: 14px;
+}
+
+.result h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.result a {
+  color: #38bdf8;
+  text-decoration: none;
+}
+
+.result a:hover {
+  text-decoration: underline;
+}
+
+.muted {
+  margin-top: 2px;
+  color: #6b7280;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 22px 18px 18px;
+    border-radius: 20px;
+  }
+
+  .title {
+    font-size: 22px;
+  }
+}
+
